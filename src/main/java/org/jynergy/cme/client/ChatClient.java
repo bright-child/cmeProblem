@@ -33,6 +33,7 @@ import java.util.StringTokenizer;
 public class ChatClient extends JFrame implements Runnable, Protocol
 {
     private final static String LINE_SEPARATOR = System.lineSeparator();
+    private final static String NONE = "None";
 
     private Socket socket;
     private String clientName;
@@ -40,7 +41,9 @@ public class ChatClient extends JFrame implements Runnable, Protocol
     private JTextField jTextField;
     private JButton jButton;
     private JComboBox jComboBox;
+    private JComboBox jFilterComboBox;
     private PrintWriter printWriter;
+    private String filteredText;
 
     public ChatClient( String clientName,
                        String serverName,
@@ -98,6 +101,10 @@ public class ChatClient extends JFrame implements Runnable, Protocol
         jComboBox.addItem( ALL );
         jTextField = new JTextField();
 
+        jFilterComboBox = new JComboBox(  );
+        jFilterComboBox.addItem( NONE );
+        jFilterComboBox.addActionListener( a -> populateFilterText() );
+
         jButton = new JButton( "Send");
         jButton.setEnabled( false );
         jButton.addActionListener( l -> sendMessage() );
@@ -106,7 +113,12 @@ public class ChatClient extends JFrame implements Runnable, Protocol
         sendingPanel.add( new JLabel( "Who Sending to: " ) );
         sendingPanel.add( jComboBox, BorderLayout.WEST );
         sendingPanel.add( jTextField, BorderLayout.CENTER );
-        sendingPanel.add( jButton, BorderLayout.EAST );
+
+        JPanel filterPanel = new JPanel( new BorderLayout( ) );
+        filterPanel.add( jButton, BorderLayout.WEST );
+        filterPanel.add( new JLabel( "Filter" ), BorderLayout.CENTER);
+        filterPanel.add( jFilterComboBox, BorderLayout.EAST );
+        sendingPanel.add( filterPanel, BorderLayout.EAST );
 
         JScrollPane jScrollPane = new JScrollPane( jTextArea );
         jScrollPane.setBorder( BorderFactory.createTitledBorder( "Chat Output" ));
@@ -116,11 +128,21 @@ public class ChatClient extends JFrame implements Runnable, Protocol
     }
 
     /**
+     * Poupolates {@link #jComboBox} and {@link #jFilterComboBox}
+     *
+     * @param nameList
+     */
+    private void populateComboBoxes( ArrayList<String> nameList ){
+        populateJComboBox( nameList );
+        populateFilterJComboBox( nameList );
+    }
+
+    /**
      * Populates {@link #jComboBox}
      *
      * @param nameList {@link ArrayList} of names
      */
-    public void populateJComboBox( ArrayList<String> nameList ){
+    private void populateJComboBox( ArrayList<String> nameList ){
         if ( jComboBox.getItemCount() > 0 ){
             jComboBox.removeAllItems();
         }
@@ -132,14 +154,61 @@ public class ChatClient extends JFrame implements Runnable, Protocol
         jButton.setEnabled( true );
     }
 
+    private void populateFilterText(){
+        String itemSelected = (String) jFilterComboBox.getSelectedItem();
+        if ( itemSelected == null || itemSelected.equals( NONE ) ){
+            filteredText = null;
+        }
+        else{
+            filteredText = itemSelected;
+        }
+    }
+
+
+    /**
+     * Populates {@link #jFilterComboBox}
+     *
+     * @param nameList {@link ArrayList} of names
+     */
+    public void populateFilterJComboBox( ArrayList<String> nameList ) {
+        String itemSelected = (String) jFilterComboBox.getSelectedItem();
+        if ( jFilterComboBox.getItemCount() > 0 ) {
+            jFilterComboBox.removeAllItems();
+        }
+        jFilterComboBox.addItem( NONE);
+        for ( String name : nameList ) {
+            jFilterComboBox.addItem( name );
+        }
+
+        if ( itemSelected != null &&
+             itemSelected.trim().length() > 0 ){
+             if ( ! itemSelected.equals( NONE )){
+                 jFilterComboBox.setSelectedItem( itemSelected );
+             }  else{
+                 jFilterComboBox.setSelectedItem( NONE );
+             }
+        }
+
+        jButton.setEnabled( true );
+    }
+
     /**
      * Adds the text to {@link #jTextArea}
      *
      * @param line line to add
      */
     public void addTextToJTextArea( String line ){
-        line = line + LINE_SEPARATOR;
-        jTextArea.append( line );
+        if ( filteredText != null ) {
+            
+            line = line + LINE_SEPARATOR;
+            if ( line.indexOf( filteredText ) != -1 ) {
+                jTextArea.append( line );
+            }
+        }
+        else{
+            line = line + LINE_SEPARATOR;
+            jTextArea.append( line );
+        }
     }
 
     /**
@@ -196,7 +265,7 @@ public class ChatClient extends JFrame implements Runnable, Protocol
                             break;
                         case USER_LIST:
                             final ArrayList<String> nameList = createList( line.substring( 1, line.length() ) );
-                            SwingUtilities.invokeLater( () ->  populateJComboBox( nameList ));
+                            SwingUtilities.invokeLater( () ->  populateComboBoxes( nameList ));
                             break;
                         case MESSAGE:
                             final String message  = line.substring( 1, line.length() );
